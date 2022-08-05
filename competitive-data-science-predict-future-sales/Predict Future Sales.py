@@ -5,7 +5,7 @@
 
 # ## Importing Libraries
 
-# In[96]:
+# In[264]:
 
 
 import numpy as np
@@ -18,10 +18,12 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 import warnings 
 warnings.filterwarnings('ignore')
 
-import random
-random.seed(0)
+from statsmodels.tsa.arima_model import ARIMA
+import pmdarima as pm
+from pmdarima.arima import auto_arima
 
-STEPS = 26
+STEPS = 31
+PERIODS = 4
 
 
 # ## Loading Data
@@ -34,10 +36,10 @@ STEPS = 26
 # * item_categories.csv  - supplemental information about the items categories.
 # * shops.csv- supplemental information about the shops.
 
-# In[2]:
+# In[10]:
 
 
-trainData = pd.read_csv('./sales_train.csv', parse_dates=['date'])
+trainData = pd.read_csv('./input/sales_train.csv', parse_dates=['date'])
 
 
 # ### Data fields
@@ -73,7 +75,7 @@ trainData.hist(figsize=(20, 20))
 
 # ## Data Preprocessing
 
-# In[113]:
+# In[11]:
 
 
 trainData = trainData[(trainData['item_price'] > 0) & (trainData['item_price'] < 10000)]
@@ -94,7 +96,7 @@ sns.distplot(trainData['item_cnt_day'], ax = ax[1, 1])
 
 # ### Rolling mean and standard deviation graphs
 
-# In[116]:
+# In[57]:
 
 
 from statsmodels.tsa.stattools import adfuller
@@ -117,22 +119,22 @@ def test_stationarity(df, period = 12, dft=False):
         print(dfoutput)
 
 
-# In[117]:
+# In[61]:
 
 
-test_stationarity(trainData['item_cnt_day'], period = 30)
+test_stationarity(trainData['item_cnt_day'], period = 60)
 
 
 # ### Per month
 
-# In[110]:
+# In[62]:
 
 
 trainData['Month'] = trainData['date'].dt.to_period('M')
 trainData
 
 
-# In[111]:
+# In[63]:
 
 
 trainDataPerMonth = trainData.groupby(['Month']).agg({'item_cnt_day' : 'sum'})
@@ -144,7 +146,7 @@ trainDataPerMonth.plot()
 
 # ### Decomposition Type and data transformation
 
-# In[97]:
+# In[65]:
 
 
 #import the required modules for TimeSeries data generation:
@@ -171,7 +173,7 @@ def tsdisplay(y, figsize = (15, 10), title = "", lags = 12):
     plt.show()
 
 
-# In[94]:
+# In[66]:
 
 
 #Import the required modules for model estimation:
@@ -195,11 +197,13 @@ def decomposition(df):
     plt.show()
 
 
-# In[80]:
+# In[67]:
 
 
 decomposition(trainDataPerMonth)
 
+
+#  #### Checks for Stationarity of the time serie
 
 # In[89]:
 
@@ -211,7 +215,9 @@ test_stationarity(trainDataPerMonth['item_cnt_month'], 6, True)
 
 # ## Forecasting
 
-# In[82]:
+# ### Train Test Split
+
+# In[381]:
 
 
 log_passengers = np.log(trainDataPerMonth)
@@ -220,28 +226,11 @@ trainDataPerMonthShift.dropna(inplace=True)
 trainDataPerMonthShift.plot()
 
 
-# In[88]:
+# In[382]:
 
-
-test_stationarity(trainDataPerMonthShift['item_cnt_month'], 6, True)
-
-
-# In[98]:
-
-
-tsdisplay(trainDataPerMonthShift)
-
-
-# ### Train Test Split
-
-# In[99]:
-
-
-from sklearn.linear_model import LinearRegression
 
 train = trainDataPerMonthShift[:STEPS]
 test = trainDataPerMonthShift[STEPS:]
-
 
 print(f"Train dates : {train.index.min()} --- {train.index.max()}  (n={len(train)})")
 print(f"Test dates  : {test.index.min()} --- {test.index.max()}  (n={len(test)})")
@@ -252,59 +241,59 @@ test['item_cnt_month'].plot(ax=ax, label='test')
 ax.legend()
 
 
-# In[100]:
+# #### ARIMA
+
+# In[262]:
 
 
-from statsmodels.tsa.arima_model import ARIMA
-
-model = ARIMA(train, order=(1,1,0))
-results_ARIMA = model.fit(disp=-1)
+trainShift1 = train - train.shift(1)
+trainShift1 = trainShift1.dropna()
+model = ARIMA(trainShift1, order=(0,0,2))
+results_ARIMA = model.fit()
 train.plot()
 plt.plot(results_ARIMA.fittedvalues, color='red')
-print('RSS: %.4f' %sum((results_ARIMA.fittedvalues-train['item_cnt_month'])[1:]**2))
-print("plotting ARIMA model")
+plt.title('ARIMA model')
 
 
-# In[101]:
+# In[263]:
 
 
-results_ARIMA.plot_predict(1,40)
+results_ARIMA.plot_predict(1,36)
 
 
-# In[102]:
+# In[265]:
 
 
-x = results_ARIMA.forecast(steps=9)[0]
-x 
+ARIMAForecast = results_ARIMA.forecast(steps=PERIODS)[0]
 
 
-# In[103]:
+# In[266]:
 
 
 
 from sklearn.metrics import mean_squared_error
-mean_squared_error(x,test['item_cnt_month'])
+mean_squared_error(ARIMAForecast,test['item_cnt_month'])
 
 
-# In[104]:
+# In[267]:
 
 
-pred = pd.Series(x, index = test.index)
+pred = pd.Series(ARIMAForecast, index = test.index)
 
 
-# In[105]:
+# In[268]:
 
 
 fig, ax = plt.subplots(figsize=(9, 4))
-train['item_cnt_month'].plot(ax=ax, label='train')
-test['item_cnt_month'].plot(ax=ax, label='test')
-pred.plot(label='pred')
+train['item_cnt_month'].plot(ax=ax, label='Train')
+test['item_cnt_month'].plot(ax=ax, label='Test')
+pred.plot(label='Forecast')
 ax.legend()
 
 
-# New
+# #### Auto ARIMA + SHIFT
 
-# In[129]:
+# In[269]:
 
 
 trainDataPerMonthDiff = trainDataPerMonth - trainDataPerMonth.shift()
@@ -312,63 +301,153 @@ trainDataPerMonthDiff = trainDataPerMonthDiff.dropna()
 test_stationarity(trainDataPerMonthDiff['item_cnt_month'], 12, True)
 
 
-# In[138]:
+# In[344]:
 
 
-import pmdarima as pm
-from pmdarima.arima import auto_arima
-model = auto_arima(
+modelWithShift = auto_arima(
     y=trainDataPerMonthDiff[:STEPS],
     seasonal=True,
-    start_p = 1, max_p =5,
-    start_q =1, max_q =5,
-    d = None,
+    start_p = 0, max_p =5,
+    start_q = 0, max_q =5,
+    d=None,
     start_P = 1, max_P =5,
-    start_Q =1, max_Q =5,
-    D = None,
-    m=12,)
+    start_Q = 1, max_Q =5,
+    D=1,
+    m=12,
+    test = "adf",
+    trace = True, 
+    information_criterion = 'aic', 
+    suppress_warnings = True, 
+    stepwise = True)
 
 
-# In[139]:
+# In[345]:
+
+
+modelWithShift.summary()
+
+
+# In[346]:
+
+
+modelWithShift.plot_diagnostics(figsize=(14,10))
+
+
+# In[347]:
+
+
+prediction, confint = modelWithShift.predict(n_periods=PERIODS, return_conf_int=True)
+confint_df = pd.DataFrame(confint)
+prediction
+
+
+# In[348]:
+
+
+period_index = pd.period_range(
+    start = trainDataPerMonthDiff[STEPS:].index[0],
+    periods = PERIODS,
+    freq='M'
+)
+predicted_df = pd.DataFrame({'value':prediction}, index=period_index)
+
+
+# In[349]:
+
+
+plt.figure(figsize=(10, 8))
+plt.plot(trainDataPerMonthDiff[:STEPS].to_timestamp(), label='Actual')
+plt.plot(predicted_df.to_timestamp(), color='orange', label='Predicted')
+plt.plot(trainDataPerMonthDiff[STEPS:], label='Test')
+plt.fill_between(period_index.to_timestamp(), confint_df[0], confint_df[1], color='grey', alpha=.2, label='Confidence Intervals Area')
+plt.legend()
+plt.show()
+
+
+# #### Auto ARIMA
+
+# In[366]:
+
+
+model=auto_arima(trainDataPerMonth[:STEPS],
+                 start_p = 0, start_q = 0, 
+                 d=1,
+                 D=1, 
+                 m = 12, 
+                 seasonal = True, 
+                 test = "adf",  
+                 trace = True, 
+                 alpha = 0.05, 
+                 information_criterion = 'aic', 
+                 suppress_warnings = True, 
+                 stepwise = True)
+
+
+# In[367]:
 
 
 model.summary()
 
 
-# In[167]:
+# In[368]:
 
 
-prediction, confint = model.predict(n_periods=12, return_conf_int=True)
+model.plot_diagnostics(figsize=(14,10))
+plt.show()
+
+
+# In[383]:
+
+
+prediction, confint = model.predict(n_periods = PERIODS, return_conf_int = True)
+period_index = pd.period_range(start = trainDataPerMonthDiff[STEPS:].index[0], periods = PERIODS, freq='M')
+forecast = pd.DataFrame({'Predicted item_cnt_month': prediction.round(2)}, index = period_index)
+forecast.head()
+
+
+# In[370]:
+
+
 confint_df = pd.DataFrame(confint)
-prediction
-
-
-# In[168]:
-
-
-period_index = pd.period_range(
-    start = trainDataPerMonthDiff[:STEPS].index[-1],
-    periods = 12,
-    freq='M'
-)
-predicted_df = pd.DataFrame({'value':prediction}, index=period_index)
-predicted_df
-
-
-# In[171]:
-
-
-plt.figure(figsize=(10, 8))
-plt.plot(trainDataPerMonthDiff[:STEPS].to_timestamp(), label='Actual data')
-plt.plot(predicted_df.to_timestamp(), color='orange', label='Predicted data')
-plt.plot(trainDataPerMonthDiff[STEPS:], label='Test data')
-plt.fill_between(period_index.to_timestamp(), confint_df[0], confint_df[1],color='grey',alpha=.2, label='Confidence Intervals Area')
+prediction_series = pd.Series(prediction,index=period_index)
+plt.figure(figsize=(15, 10))
+trainDataPerMonth['item_cnt_month'][:STEPS].plot(color='red', label='Actual')
+prediction_series.plot(color='orange', label='Predicted')
+trainDataPerMonth['item_cnt_month'][STEPS:].plot(color='green', label='Test')
+plt.fill_between(prediction_series.index.to_timestamp(), confint_df[0], confint_df[1], color='grey', alpha=.2, label='Confidence Intervals Area')
 plt.legend()
 plt.show()
 
 
-# In[ ]:
+# In[377]:
 
 
+trainDF = trainData.groupby(['shop_id', 'item_id'])['date', 'item_cnt_day'].agg({'item_cnt_day':'sum'})
+trainDF = trainDF.reset_index()
+trainDF.head()
 
+
+# ## Submission
+
+# ### Loading test data
+
+# In[375]:
+
+
+testData = pd.read_csv("./input/test.csv")
+testData.head()
+
+
+# In[379]:
+
+
+testData['item_cnt_month'] = (prediction[0].round(2)*len(testData)/len(testData))/len(testData)
+submission  = testData.drop(['shop_id', 'item_id'], axis = 1)
+submission.head()
+
+
+# In[380]:
+
+
+submission.to_csv('submission.csv', index = False)
 
