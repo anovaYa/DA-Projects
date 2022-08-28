@@ -7,7 +7,7 @@
 
 # ## Importing Libraries
 
-# In[1]:
+# In[3]:
 
 
 import numpy as np
@@ -25,13 +25,13 @@ RAND = 10
 
 # ## Loading Data
 
-# In[167]:
+# In[68]:
 
 
 videoGameData = pd.read_csv('../input/vgsales.csv', parse_dates=['Year'])
 
 
-# In[3]:
+# In[69]:
 
 
 videoGameData.head()
@@ -66,57 +66,63 @@ videoGameData.head()
 # 
 # The script to scrape the data is available at https://github.com/GregorUT/vgchartzScrape.
 
-# In[4]:
+# In[70]:
 
 
 videoGameData.info()
 
 
-# In[5]:
+# In[71]:
 
 
 videoGameData.describe()
 
 
-# In[6]:
+# In[72]:
 
 
 videoGameData.describe(include='object')
 
 
-# In[7]:
+# In[73]:
 
 
 fig, ax = plt.subplots(2, 2, figsize=(15, 8))
 sns.boxplot(videoGameData['NA_Sales'][videoGameData['NA_Sales']<10], palette='PRGn', ax = ax[0, 0])
 sns.distplot(videoGameData['NA_Sales'][videoGameData['NA_Sales']<10], ax = ax[1, 0])
-sns.boxplot(videoGameData['Global_Sales'][videoGameData['NA_Sales']<10], palette='PRGn', ax = ax[0, 1])
-sns.distplot(videoGameData['Global_Sales'][videoGameData['NA_Sales']<10], ax = ax[1, 1])
+sns.boxplot(videoGameData['Global_Sales'][videoGameData['Global_Sales']<10], palette='PRGn', ax = ax[0, 1])
+sns.distplot(videoGameData['Global_Sales'][videoGameData['Global_Sales']<10], ax = ax[1, 1])
 
 
 # ## Data Preprocessing
 
-# In[168]:
+# In[74]:
 
 
 videoGameData.isnull().sum()
 
 
-# In[169]:
+# In[75]:
 
 
 videoGameData.dropna(inplace=True)
 
 
-# In[170]:
+# In[76]:
 
 
 videoGameData['Year'] = videoGameData['Year'].dt.to_period('Y')
 
 
+# In[77]:
+
+
+videoGameData = videoGameData.drop(videoGameData['Global_Sales'].idxmax())
+
+
 # ### Categorical Data
 
-# In[171]:
+# In[79]:
 
 
 videoGameData['Genre'] = videoGameData['Genre'].astype('category')
@@ -126,14 +132,14 @@ videoGameData['Publisher'] = videoGameData['Publisher'].astype('category')
 
 # #### Add categorical columns 
 
-# In[172]:
+# In[80]:
 
 
 platformCatDict = dict( enumerate(videoGameData['Platform'].cat.categories ) )
 genreCatDict = dict( enumerate(videoGameData['Genre'].cat.categories ) )
 
 
-# In[173]:
+# In[81]:
 
 
 # videoGameData['Genre_cat'] = videoGameData['Genre'].cat.codes.astype('int')
@@ -143,18 +149,18 @@ videoGameData['Publisher_cat'] = videoGameData['Publisher'].cat.codes.astype('in
 
 # #### Name id
 
-# In[174]:
+# In[82]:
 
 
 videoGameData['Name_id'] = videoGameData['Name'].astype('category')
 nameIDDict = dict( enumerate(videoGameData['Name_id'].cat.categories ) )
 videoGameData['Name_id'] = videoGameData['Name_id'].cat.codes.astype('int')
-videoGameData
+videoGameData.head()
 
 
 # ## Data Exploration and Analysis
 
-# In[15]:
+# In[83]:
 
 
 videoGameData['Year'].value_counts()[:20].plot(kind='bar')
@@ -162,7 +168,7 @@ plt.xlabel('Year')
 plt.ylabel('Count')
 
 
-# In[16]:
+# In[84]:
 
 
 plt.figure(figsize=(15, 5))
@@ -171,7 +177,7 @@ plt.ylabel('Count')
 plt.xlabel('Genre')
 
 
-# In[17]:
+# In[85]:
 
 
 plt.figure(figsize=(15, 5))
@@ -180,7 +186,7 @@ plt.ylabel('Count')
 plt.xlabel('Platform')
 
 
-# In[18]:
+# In[86]:
 
 
 plt.figure(figsize=(15, 5))
@@ -188,7 +194,7 @@ videoGameData.groupby(by=['Year'])['Global_Sales'].sum().plot(kind='bar')
 plt.ylabel('Global sales')
 
 
-# In[19]:
+# In[87]:
 
 
 plt.figure(figsize=(15, 5))
@@ -196,7 +202,7 @@ videoGameData.groupby(by=['Platform'])['Global_Sales'].sum().plot(kind='bar')
 plt.ylabel('Global sales')
 
 
-# In[20]:
+# In[88]:
 
 
 plt.figure(figsize=(15, 5))
@@ -204,13 +210,13 @@ videoGameData.groupby(by=['Genre'])['Global_Sales'].sum().plot(kind='bar')
 plt.ylabel('Global sales')
 
 
-# In[21]:
+# In[89]:
 
 
 videoGameData['Publisher'].value_counts()[:25].plot(kind='bar')
 
 
-# In[22]:
+# In[90]:
 
 
 salesPerYear = videoGameData.loc[:, ['Year', 'NA_Sales', 'EU_Sales', 'JP_Sales', 'Other_Sales']].groupby(by =  'Year'  ).sum()
@@ -220,7 +226,7 @@ plt.ylabel('Total Sales')
 
 # ## Correlation Heatmap
 
-# In[23]:
+# In[91]:
 
 
 plt.figure(figsize=(15,10))
@@ -230,7 +236,7 @@ heatmap.set_title('Correlation Heatmap', fontdict={'fontsize':12}, pad=12)
 
 # ## Modeling
 
-# In[175]:
+# In[92]:
 
 
 dataLabels = pd.get_dummies(videoGameData, columns=['Genre'])
@@ -238,7 +244,7 @@ dataLabels['Year'] = dataLabels['Year'].astype('int')
 dataLabels = dataLabels.drop(columns=['Name', 'Publisher', 'Platform'], axis=1)
 
 
-# In[176]:
+# In[93]:
 
 
 dataLabels.info()
@@ -246,7 +252,7 @@ dataLabels.info()
 
 # ### PCA (Principal Component Analysis)
 
-# In[177]:
+# In[94]:
 
 
 from sklearn.preprocessing import StandardScaler
@@ -267,7 +273,7 @@ plt.xlabel('number of components')
 plt.ylabel('cumulative explained variance');
 
 
-# In[179]:
+# In[95]:
 
 
 import plotly.express as px
@@ -300,7 +306,7 @@ fig.update_layout(
 )
 
 
-# In[184]:
+# In[112]:
 
 
 X_scaled = StandardScaler().fit_transform(dataLabels)
@@ -312,7 +318,7 @@ pca_3 = PCA(n_components=13, random_state=RAND)
 X_embedding_pca_3 = pca_3.fit_transform(X_scaled)
 
 fig = px.scatter_3d(
-    X_embedding_pca, x=1, y=9, z=13,
+    X_embedding_pca, x=3, y=7, z=12,
     labels={'color': 'species'}
 )
 fig.update_traces(marker_size=2)
@@ -320,7 +326,7 @@ fig.update_traces(marker_size=2)
 
 # ### KMeans
 
-# In[185]:
+# In[97]:
 
 
 from sklearn.cluster import SpectralClustering, KMeans, AgglomerativeClustering
@@ -347,7 +353,7 @@ dict_clusters_km = plot_clustering(data=dataLabels,
                                    type_train='embedding')
 
 
-# In[186]:
+# In[98]:
 
 
 videoGameData['Genre_cat'] = videoGameData['Genre'].cat.codes.astype('int')
@@ -365,38 +371,67 @@ num_cols = [
 ]
 
 
-# In[188]:
+# In[107]:
 
 
-plotting_kde_num(videoGameData, dict_clusters_km[4], num_cols)
-plotting_num(videoGameData, dict_clusters_km[4], num_cols)
+plotting_kde_num(videoGameData, dict_clusters_km[6], num_cols)
+plotting_num(videoGameData, dict_clusters_km[6], num_cols)
 
 
-# In[193]:
+# In[110]:
 
 
 fig = px.scatter_3d(
-    X_embedding_pca, x=6, y=9, z=13,
+    X_embedding_pca, x=3, y=7, z=12,
     labels={'color': 'species'},
     color=dict_clusters_km[6]
 )
 fig.update_traces(marker_size=2)
 
 
-# In[197]:
+# In[111]:
 
 
-sns.scatterplot(X_embedding_pca[:,9], X_embedding_pca[:,13], c=dict_clusters_km[6])
+sns.scatterplot(X_embedding_pca[:,7], X_embedding_pca[:,12], c=dict_clusters_km[6])
 
 
-# In[198]:
+# ## t-statistic
+
+# In[114]:
 
 
-sns.scatterplot(videoGameData['NA_Sales'], videoGameData['Global_Sales'], hue=dict_clusters_km[6])
+videoGameDataClus = videoGameData.copy()
 
 
-# In[ ]:
+# In[115]:
 
 
+videoGameDataClus['cluster'] = dict_clusters_km[6]
 
+
+# In[117]:
+
+
+clusterSdt = []
+for i in set(dict_clusters_km[6]):
+    clusterSdt.append(videoGameDataClus[videoGameDataClus['cluster'] == i]['Global_Sales'].std())
+print('std:')
+for c, n in enumerate(clusterSdt):
+    print(f'cluster {c} - {n}')
+
+
+# In[120]:
+
+
+plt.figure(figsize=(20, 20))
+sns.boxplot(x='cluster', y='Global_Sales', data=videoGameDataClus)
+
+
+# In[139]:
+
+
+fig, ax = plt.subplots(3, 2, figsize=(25, 20))
+for i, ax in zip(set(dict_clusters_km[6]), ax.ravel()):
+    plt.title(i)
+    sns.countplot(videoGameDataClus[videoGameDataClus['cluster'] == i]['Genre'], ax = ax).set(title=f'cluster = {i}')
 
