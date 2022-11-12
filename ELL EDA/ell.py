@@ -5,7 +5,7 @@
 
 # ## Import Libraries
 
-# In[96]:
+# In[1]:
 
 
 import numpy as np
@@ -18,12 +18,16 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 import warnings 
 warnings.filterwarnings('ignore')
 
+
+# In[38]:
+
+
 import re
 from wordcloud import WordCloud
 from wordcloud import STOPWORDS
 
 import nltk
-nltk.download('wordnet')
+
 from textblob import TextBlob
 from sklearn.feature_extraction import text
 from sklearn.feature_extraction.text import CountVectorizer
@@ -33,30 +37,28 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.svm import LinearSVC
+
 from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import precision_score, recall_score
-from sklearn.metrics import f1_score
+
 from sklearn.metrics import precision_recall_curve
-from sklearn.metrics import roc_curve
-from sklearn.metrics import roc_auc_score
+
 from sklearn.metrics import classification_report
+
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 # ## Loading The Dataset
 
 # *Using Pandas Library, we’ll load the CSV file. Named it with ellTrainData for the dataset.*
 
-# In[111]:
+# In[3]:
 
 
 ellTrainData = pd.read_csv('input/train.csv')
 
 
-# In[112]:
+# In[4]:
 
 
 ellTrainData.head()
@@ -66,13 +68,13 @@ ellTrainData.head()
 
 # *Get the number of columns and rows*
 
-# In[113]:
+# In[5]:
 
 
 ellTrainData.shape
 
 
-# In[114]:
+# In[6]:
 
 
 ellTrainData.info()
@@ -80,7 +82,7 @@ ellTrainData.info()
 
 # *From the info, we know that there are 3911 entries and 8 columns.*
 
-# In[115]:
+# In[7]:
 
 
 ellTrainData.isnull().sum()
@@ -88,13 +90,13 @@ ellTrainData.isnull().sum()
 
 # *There are no null entries.*
 
-# In[116]:
+# In[8]:
 
 
 ellTrainData.describe()
 
 
-# In[117]:
+# In[9]:
 
 
 # Basic text cleaning function
@@ -106,17 +108,17 @@ def remove_noise(text):
     # Remove whitespaces
     text = text.apply(lambda x: " ".join(x.strip() for x in x.split()))
     
-    # Remove special characters
-    text = text.apply(lambda x: "".join([" " if ord(i) < 32 or ord(i) > 126 else i for i in x]))
+#     # Remove special characters
+#     text = text.apply(lambda x: "".join([" " if ord(i) < 32 or ord(i) > 126 else i for i in x]))
     
-    # Remove punctuation
-    text = text.str.replace('[^\w\s]', '')
+#     # Remove punctuation
+#     text = text.str.replace('[^\w\s]', '')
     
     # Remove numbers
     text = text.str.replace('\d+', '')
     
-    # Remove Stopwords
-    text = text.apply(lambda x: ' '.join([word for word in x.split() if word not in (STOPWORDS)]))
+#     # Remove Stopwords
+#     text = text.apply(lambda x: ' '.join([word for word in x.split() if word not in (STOPWORDS)]))
     
     # Convert to string
     text = text.astype(str)
@@ -124,7 +126,7 @@ def remove_noise(text):
     return text
 
 
-# In[118]:
+# In[10]:
 
 
 # Applying noise removal function to data
@@ -132,7 +134,7 @@ ellTrainData['filtered_text'] = remove_noise(ellTrainData['full_text'])
 ellTrainData.head()
 
 
-# In[119]:
+# In[11]:
 
 
 # Defining a sentiment analyser function
@@ -146,7 +148,7 @@ ellTrainData.head()
 
 # ## Lexicon Normalisation
 
-# In[120]:
+# In[12]:
 
 
 # Instantiate the Word tokenizer & Word lemmatizer
@@ -158,26 +160,26 @@ def lemmatize_text(text):
     return [lemmatizer.lemmatize(w) for w in w_tokenizer.tokenize(text)]
 
 # Apply the word lemmatizer function to data
-ellTrainData['filtered_text'] = ellTrainData['filtered_text'].apply(lemmatize_text)
+ellTrainData['filtered_text_lemmatize'] = ellTrainData['filtered_text'].apply(lemmatize_text)
 ellTrainData.head()
 
 
 # ## Exploratory Analysis and Visualization
 
-# In[121]:
+# In[13]:
 
 
 ellTrainData['text_len'] = ellTrainData['full_text'].apply(lambda x: len(x))
 ellTrainData['words_num'] = ellTrainData['full_text'].apply(lambda x: len(x.split()))
 
 
-# In[122]:
+# In[14]:
 
 
 ellTrainData.head()
 
 
-# In[123]:
+# In[15]:
 
 
 # Length of full_text and words num
@@ -190,10 +192,10 @@ sns.distplot(ellTrainData['words_num'], ax = ax[1, 1])
 
 # ## WordCloud
 
-# In[124]:
+# In[16]:
 
 
-text = " ".join(j for i in ellTrainData['filtered_text'] for j in i)
+text = " ".join(j for i in ellTrainData['filtered_text_lemmatize'] for j in i)
 stopwords = set(STOPWORDS)
 wordcloud = WordCloud(stopwords=stopwords, background_color="white").generate(text)
 plt.figure( figsize=(15,10))
@@ -204,33 +206,32 @@ plt.show()
 
 # ## Getting a text matrix
 
-# In[125]:
+# In[17]:
 
 
 # Getting a count of words from the documents
-# Ngram_range is set to 1,2 - meaning either single or two word combination will be extracted
-cvec = CountVectorizer(min_df=.05, max_df=.9, ngram_range=(1,2), tokenizer=lambda x: x, lowercase=False)
-cvec.fit(ellTrainData['filtered_text'])
+cvec = CountVectorizer(min_df=.02, max_df=.7, ngram_range=(1,2), tokenizer=lambda x: x, lowercase=False)
+cvec.fit(ellTrainData['filtered_text_lemmatize'])
 
 
-# In[126]:
+# In[18]:
 
 
 # Getting the total n-gram count
 len(cvec.vocabulary_)
 
 
-# In[127]:
+# In[19]:
 
 
 # Creating the bag-of-words representation
-cvec_counts = cvec.transform(ellTrainData['filtered_text'])
+cvec_counts = cvec.transform(ellTrainData['filtered_text_lemmatize'])
 print('sparse matrix shape:', cvec_counts.shape)
 print('nonzero count:', cvec_counts.nnz)
 print('sparsity: %.2f%%' % (100.0 * cvec_counts.nnz / (cvec_counts.shape[0] * cvec_counts.shape[1])))
 
 
-# In[128]:
+# In[20]:
 
 
 # Instantiating the TfidfTransformer
@@ -241,7 +242,7 @@ transformed_weights = transformer.fit_transform(cvec_counts)
 transformed_weights
 
 
-# In[129]:
+# In[21]:
 
 
 # Getting a list of all n-grams
@@ -258,7 +259,7 @@ model.head()
 
 # ### Merging datasets
 
-# In[130]:
+# In[22]:
 
 
 # Merging td-idf weight matrix with original DataFrame
@@ -266,7 +267,7 @@ model = pd.merge(ellTrainData, model, left_index=True, right_index=True)
 model.head()
 
 
-# In[131]:
+# In[23]:
 
 
 # Getting a view of the top 20 occurring words
@@ -275,7 +276,7 @@ counts_df = pd.DataFrame({'Term': cvec.get_feature_names(), 'Occurrences': occ})
 counts_df.sort_values(by='Occurrences', ascending=False).head(25)
 
 
-# In[132]:
+# In[24]:
 
 
 # Getting a view of the top 20 weights
@@ -284,7 +285,7 @@ weights_df = pd.DataFrame({'Term': cvec.get_feature_names(), 'Weight': weights})
 weights_df.sort_values(by='Weight', ascending=False).head(25)
 
 
-# In[133]:
+# In[25]:
 
 
 # Countplot
@@ -301,7 +302,7 @@ plt.show()
 model[scList].apply(pd.Series.value_counts)
 
 
-# In[134]:
+# In[26]:
 
 
 # Visualising polarity between scores
@@ -312,41 +313,115 @@ for score in scList:
 
 # ## Machine Learning
 
-# In[143]:
-
-
-# Drop all columns not part of the text matrix
-ml_model = model.drop(['text_id', 'full_text', 'filtered_text', 'polarity', 'Keyword', 'Max', 'Sum'], axis=1)
-
-
-# In[144]:
-
-
-# Create X & y variables for Machine Learning
-X = ml_model.drop(scList, axis=1)
-y = ml_model[scList]
-
-# Create a train-test split of these variables
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state=42)
-
-
-# In[145]:
+# In[27]:
 
 
 # Defining a function to fit and predict ML algorithms
-def modelRes(mod, model_name, x_train, y_train, x_test, y_test):
+def modelRes(mod, y_name, x_train, y_train, x_test, y_test):
     mod.fit(x_train, y_train)
-    print(model_name)
-    acc = cross_val_score(mod, X_train, y_train, scoring = "accuracy", cv = 5)
-    predictions = cross_val_predict(mod, X_train, y_train, cv = 5)
+    print(y_name)
+    acc = cross_val_score(mod, x_train, y_train, scoring = "accuracy", cv = 5)
+    predictions = cross_val_predict(mod, x_test, y_test, cv = 5)
     print("Accuracy:", round(acc.mean(),3))
-    cm = confusion_matrix(predictions, y_train)
-    print("Confusion Matrix:  \n", cm)
-    print("Classification Report \n",classification_report(predictions, y_train))
+    print("Classification Report \n",classification_report(predictions, y_test))
 
 
-# In[ ]:
+# In[28]:
 
 
+text = remove_noise(ellTrainData['full_text'])
 
+max_words = round(text.apply(lambda x: len(x.split())).max())
+
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(text)
+word_index = tokenizer.word_index
+
+train_seq = tokenizer.texts_to_sequences(text)
+pad_train = pad_sequences(train_seq, maxlen=max_words, truncating='post')
+
+
+word_idx_count = len(word_index)
+print(word_idx_count)
+
+
+# In[29]:
+
+
+scList = ['cohesion', 'syntax', 'vocabulary', 'phraseology', 'grammar', 'conventions']
+
+X = pad_train
+
+for score in scList:
+    y = ellTrainData[score].replace([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0], [0, 1, 2, 3, 4, 5, 6, 7, 8])
+    # Create a train-test split of these variables
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.25, random_state=42)
+    model = LogisticRegression()
+    modelRes(model, score, X_train, y_train, X_test, y_test)
+    
+
+
+# ## Prediction
+
+# In[30]:
+
+
+ellTestData = pd.read_csv('input/test.csv')
+
+
+# In[31]:
+
+
+ellTestData.head()
+
+
+# In[32]:
+
+
+ellTestData['filtered_text'] = remove_noise(ellTestData['full_text'])
+ellTestData.head()
+
+
+# In[33]:
+
+
+test_seq = tokenizer.texts_to_sequences(ellTestData['filtered_text'])
+pad_test = pad_sequences(test_seq, maxlen=max_words, truncating='post')
+
+
+# In[34]:
+
+
+scList = ['cohesion', 'syntax', 'vocabulary', 'phraseology', 'grammar', 'conventions']
+
+submission = pd.DataFrame()
+
+submission['text_id'] = ellTestData['text_id'].copy()
+
+for score in scList:
+    y = ellTrainData[score].replace([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0], [0, 1, 2, 3, 4, 5, 6, 7, 8])
+    model = LogisticRegression()
+    model.fit(pad_train, y)
+    print(score, model.score(pad_train, y))
+    submission[score] = model.predict(pad_test).tolist()
+
+
+# In[35]:
+
+
+submission[scList] = submission[scList].replace([0, 1, 2, 3, 4, 5, 6, 7, 8], [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
+
+
+# In[36]:
+
+
+submission.head()
+
+
+# ## Submission
+
+# In[37]:
+
+
+submission.to_csv("submission.csv", index=False)
 
